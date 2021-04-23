@@ -1,31 +1,6 @@
-export default { filter_soap2rest, proxy_rest2soap }
+export default { proxy_rest2soap }
 
 var res = "";
-var buf = 0;
-function filter_xml2json(r, data, flags) {
-    if (data.length) buf++;
-    res += data;      // Collect the entire response,
-    if (flags.last) { //  until we get the last byte.
-        try {
-            var x = global.xmljs; // require("xml-js")
-            var opts = {
-                spaces: 4,
-                compact: true,
-                trim: true,
-                nativeType: true,
-                nativeTypeAttributes: true,
-                ignoreDeclaration: true,
-                ignoreInstruction: true
-            };
-            var j = x.xml2json(res.replace(/^\s+|\s+$/g, ""), opts); // Must strip trailing newlines, trim() is inadequate
-            r.sendBuffer(j, flags);
-            ngx.log(ngx.INFO, `FILTERED ${res.length} bytes in ${buf} buffers`);
-        } catch (e) {
-            ngx.log(ngx.ERR, `ERROR ${e}`);
-            r.sendBuffer("", flags);
-        }
-    }
-}
 
 var countryTmpl = {
     "soapenv:Envelope": {
@@ -47,11 +22,19 @@ function proxy_rest2soap(r) {
         var x = global.xmljs; // require("xml-js")
         var proxyOpts = { args: r.args, method: r.method };
         if (typeof(r.requestBuffer) != "undefined") {
-            countryName = r.requestBuffer.name
+            r.error(r.requestBuffer)
+            r.error(r.requestBuffer["name"])
+            r.error(typeof r.requestBuffer)
+            for(var key in r.requestBuffer){
+                r.error(key)
+             }
+            var countryName = r.requestBuffer.name
             var reqToSend = countryTmpl
             reqToSend["soapenv:Envelope"]["soapenv:Body"]["gs:getCountryRequest"]["gs:name"] = countryName
             var toXmlOpts = { spaces: 2, compact: true, indendAttribubtes: true, noQuotesForNativeAttributes: true }; // Must have compact: true
+            r.error(reqToSend.toString())
             proxyOpts.body = x.json2xml(reqToSend.toString(), toXmlOpts);
+            r.error(proxyOpts.body)
         }
         r.subrequest(r.variables.proxy_location, proxyOpts)
         .then(res => {
